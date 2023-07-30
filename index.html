@@ -1,1 +1,564 @@
-"Hello World" 
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <!--https://github.com/susielu/d3-annotation/blob/master/d3-annotation.js-->
+    <script src="https://rawgit.com/susielu/d3-annotation/master/d3-annotation.min.js"></script>
+
+    <!--https://www.w3.org/wiki/CSS/Properties/color/keywords-->
+    <style>
+        circle {
+            fill: lightblue;
+            stroke: black;
+        }
+
+        .diesel {
+            fill: crimson;
+        }
+
+        .electricity {
+            fill: gold;
+        }
+
+        .gasoline {
+            fill: steelblue;
+        }
+
+        div {
+            margin: 2em;
+        }
+
+        p {
+            font-size: 20px;
+        }
+
+        #pageNavigation {
+            margin-left: 8em;
+        }
+
+        h1 {
+            text-align: center;
+        }
+    </style>
+</head>
+
+<head>
+    <title>Fuel Efficiency of Cars (2017)</title>
+    <meta content="text/html; charset=utf-8" />
+</head>
+
+<!--FIRST SCENE-->
+
+<body onload="init()">
+    <!--Keep for now, adjust as needed?-->
+
+    <div>
+        <h1>Fuel Efficiency of Different Car Types</h1>
+
+        <div id="container">
+            <svg width=420 height=420 id="scatterplot" style="display:inline-block"></svg>
+            <p style="display:inline-block; vertical-align: top;" id="firstscene"></p>
+
+            <!--No previous button @ 1st scene, if not just don't hook.-->
+            <div id="pageNavigation">
+                <button onclick="previousPage()">Previous</button>
+                <span id="page"></span>
+                <button onclick="nextPage()">Next Page</button>
+            </div>
+        </div>
+    </div>
+
+    <!--LOAD DATASET: REF TO 8-2-6-->
+    <script>
+        // const --> Can't be changed, var --> Can be changed
+        var page, data;
+
+        // load the page, generate a scatterplot (function) to page
+        async function init() {
+
+            // Start @ 1
+            page = 1
+            data = await d3.csv("https://flunky.github.io/cars2017.csv")
+
+            // const svgDraw = 200 --> width
+            // const svgMax = 300 --> height
+            // const svgMargin = (svgMax - svgDraw) / 2
+
+            // var xScale = d3.scaleLog().domain([10, 150]).range([0, svgDraw])
+            // var yScale = d3.scaleLog().domain([10, 150]).range([svgDraw, 0])
+
+            // https://stackoverflow.com/questions/10893004/d3-transform-scale-and-translate
+            generateScatterplot();
+        }
+
+        function generateScatterplot() {
+
+            const width = 300
+            const height = 300
+            const margin = 60
+
+            var x = d3.scaleLog().base(10).domain([10, 150]).range([0, width])
+            var y = d3.scaleLog().base(10).domain([10, 150]).range([height, 0])
+
+            // Tooltips --> Manual? | Can try d3-annotation if it doesn't work
+            // https://d3-graph-gallery.com/graph/interactivity_tooltip.html
+            // mouseover --> mousemove --> mouseout
+            var generateTooltip = d3.select("#container")
+                .append("div")
+                .style("position", "absolute")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "1px")
+                .style("border-radius", "5px")
+                .style("padding", "10px")
+
+            // d3.select("#circleCustomTooltip")
+
+            var mouseover = (d, _) => {
+                generateTooltip.style("opacity", 1)
+            }
+
+            var mousemove = (d, e) => {
+                generateTooltip
+                    .html(`Make: ${d.Make}<br>Fuel: ${d.Fuel}<br>Average City MPG: ${d.AverageCityMPG}<br>Average Highway MPG: ${d.AverageHighwayMPG}<br>Engine Cylinders: ${d.EngineCylinders}`)
+                    .style("left", (event.x) / 2 + "px")
+                    .style("top", (event.y) / 2 + "px")
+            }
+
+            var mouseout = (d, _) => {
+                generateTooltip
+                    .transition()
+                    .style("opacity", 0)
+            }
+
+            // Tickmarks @ y axis (8-1-4)
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .call(d3.axisLeft(y)
+                    .tickValues([10, 25, 50, 100, 125, 150])
+                    .tickFormat((d, _) => d3.format("~s")(d)));
+
+            // Labels @ y axis (8-1-4), y axis first then x axis*?
+            d3.select("#scatterplot")
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0)
+                .attr("x", 0 - (height / 2 + margin))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Average Highway MPG");
+
+            // Tickmarks @ x Axis (8-1-4)
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + (margin + height) + ")")
+                .call(d3.axisBottom(x)
+                    .tickValues([10, 25, 50, 100, 125, 150])
+                    .tickFormat((d, _) => d3.format("~s")(d)));
+
+            // Labels @ x axis (8-1-4), y axis first then x axis*?
+            d3.select("#scatterplot")
+                .append("text")
+                .attr("transform", "translate(" + (width / 2 + margin) + " ," + (margin + height + 40) + ")")
+                .style("text-anchor", "middle")
+                .text("Average City MPG");
+
+            // Fill in scatterplot (8-2-6)
+            d3.select("#scatterplot")
+                .attr("width", width + (2 * margin))
+                .attr("height", height + (2 * margin))
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("class", (d, _) => d.Fuel.toLowerCase())
+                .attr("cx", (d, _) => x(d.AverageCityMPG))
+                .attr("cy", (d, _) => y(d.AverageHighwayMPG))
+                .attr("r", (d, _) => parseInt(d.EngineCylinders) + 2)
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseout", mouseout);
+
+            // Legend --> Loops?
+            // https://d3-graph-gallery.com/graph/custom_legend.html
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 200).attr("r", 3).style("fill", "crimson")
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 220).attr("r", 3).style("fill", "gold")
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 240).attr("r", 3).style("fill", "steelblue")
+
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 200).text("Diesel").style("font-size", "15px").attr("alignment-baseline", "middle")
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 220).text("Electricity").style("font-size", "15px").attr("alignment-baseline", "middle")
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 240).text("Gasoline").style("font-size", "15px").attr("alignment-baseline", "middle")
+
+            // Track Pages (Parameters + Triggers)
+            d3.select("#page").text(`Page ${page} / 3`)
+
+            // Annotation
+            const annotations = [{
+                note: {
+                    title: "Gasoline Cars",
+                    label: "Gasoline fueled cars appear to be the least fuel efficient on any road generally speaking.",
+                    wrap: 140
+                },
+                x: 150,
+                y: 200,
+                dx: 70,
+                dy: -20,
+                color: "black"
+            }];
+
+            const makeAnnotations = d3.annotation()
+                .type(d3.annotationLabel)
+                .annotations(annotations);
+
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("class", "annotation-group")
+                .call(makeAnnotations);
+
+            // Data Analysis
+            let p = `
+            This scatterplot visualizes the relationship betwen Average Highway MPG and Average City MPG for different car types (diesel, electricity, gasoline). Each car model is represented by a circle on the scatterplot and the size of the circle is determined by the # of cylinders the car has in its engine. When hovering over a data point, a tooltip will appear, displaying additional information about the car's make, fuel type, Average MPG's and # of cylinders.
+            `
+
+            // Add Data Analysis to Page
+            d3.select("#firstscene")
+                .html(p)
+        }
+
+        // Separate Webpages vs d3.select(id).html
+        // 두번째
+        function generateSecondScatterplot() {
+
+            const width = 300
+            const height = 300
+            const margin = 50
+
+            var x = d3.scaleLinear().domain([0, 12]).range([0, width])
+            var y = d3.scaleLog().base(10).domain([10, 150]).range([height, 0])
+
+            // Tooltips --> Manual? | Can try d3-annotation if it doesn't work
+            // https://d3-graph-gallery.com/graph/interactivity_tooltip.html
+            // mouseover --> mousemove --> mouseout
+            var generateTooltip = d3.select("#container")
+                .append("div")
+                .style("position", "absolute")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "1px")
+                .style("border-radius", "5px")
+                .style("padding", "10px")
+
+            // d3.select("#circleCustomTooltip")
+
+            var mouseover = (d, _) => {
+                generateTooltip.style("opacity", 1)
+            }
+
+            // Remove AverageHighwayMPG @ Tooltip
+            var mousemove = (d, e) => {
+                generateTooltip
+                    .html(`Make: ${d.Make}<br>Fuel: ${d.Fuel}<br>Average City MPG: ${d.AverageCityMPG}`)
+                    .style("left", (event.x) / 2 + "px")
+                    .style("top", (event.y) / 2 + "px")
+            }
+
+            var mouseout = (d, _) => {
+                generateTooltip
+                    .transition()
+                    .style("opacity", 0)
+            }
+
+            // Tickmarks @ y axis (8-1-4)
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .call(d3.axisLeft(y)
+                    .tickValues([10, 25, 50, 100, 125, 150])
+                    .tickFormat((d, _) => d3.format("~s")(d)));
+
+            // Labels @ y axis (8-1-4), y axis first then x axis*?
+            d3.select("#scatterplot")
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0)
+                .attr("x", 0 - (height / 2 + margin))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Average City MPG");
+
+            // Tickmarks @ x Axis (8-1-4)
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + (margin + height) + ")")
+                .call(d3.axisBottom(x)
+                    .tickValues([0, 2, 4, 6, 8, 10, 12])
+                    .tickFormat((d, _) => d3.format("~s")(d)));
+
+            // Labels @ x axis (8-1-4), y axis first then x axis*?
+            d3.select("#scatterplot")
+                .append("text")
+                .attr("transform", "translate(" + (width / 2 + margin) + " ," + (margin + height + 40) + ")")
+                .style("text-anchor", "middle")
+                .text("# of Cylinders");
+
+            // Fill in scatterplot (8-2-6)
+            d3.select("#scatterplot")
+                .attr("width", width + (2 * margin))
+                .attr("height", height + (2 * margin))
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("class", (d, _) => d.Fuel.toLowerCase())
+                .attr("cx", (d, _) => x(d.EngineCylinders))
+                .attr("cy", (d, _) => y(d.AverageCityMPG))
+                .attr("r", (d, _) => parseInt(d.EngineCylinders) + 2)
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseout", mouseout);
+
+            // Legend --> Loops?
+            // https://d3-graph-gallery.com/graph/custom_legend.html
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 200).attr("r", 3).style("fill", "crimson")
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 220).attr("r", 3).style("fill", "gold")
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 240).attr("r", 3).style("fill", "steelblue")
+
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 200).text("Diesel").style("font-size", "15px").attr("alignment-baseline", "middle")
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 220).text("Electricity").style("font-size", "15px").attr("alignment-baseline", "middle")
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 240).text("Gasoline").style("font-size", "15px").attr("alignment-baseline", "middle")
+
+            // Annotation
+            const annotations = [{
+                note: {
+                    title: "Gasoline Cars",
+                    label: "Gasoline fueled cars tend to have the largest amount of cylinders.",
+                    wrap: 140
+                },
+                x: 150,
+                y: 200,
+                dx: 70,
+                dy: -20,
+                color: "black"
+            }];
+
+            const makeAnnotations = d3.annotation()
+                .type(d3.annotationLabel)
+                .annotations(annotations);
+
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("class", "annotation-group")
+                .call(makeAnnotations);
+
+
+            // Data Analysis
+            let p = `
+            This scatterplot visualizes the relationship betwen Average City MPG and # of cylinders for different car types (diesel, electricity, gasoline). Similar to the first scatterplot, each car model is represented by a circle on the scatterplot and the size of the circle is determined by the # of cylinders the car has in its engine. Again, when hovering over a data point, a tooltip will appear, displaying additional information about the car's make, fuel type, Average MPG's and # of cylinders. This scatterplot demonstrates how having a lot of engine cylinders may affect your fuel efficiency in the city and also shows generally which type of cars has more cylinders than others. We see that gasoline cars, which tend to have the worst fuel efficiency, also tend to have the largest amount of engine cylinders.
+            `
+
+            // Add Data Analysis to Page
+            d3.select("#firstscene")
+                .html(p)
+        }
+
+        // Separate Webpages vs d3.select(id).html
+        // 세번째
+        function generateThirdScatterplot() {
+
+            const width = 300
+            const height = 300
+            const margin = 50
+
+            var x = d3.scaleLinear().domain([0, 12]).range([0, width])
+            var y = d3.scaleLog().base(10).domain([10, 150]).range([height, 0])
+
+            // Tooltips --> Manual? | Can try d3-annotation if it doesn't work
+            // https://d3-graph-gallery.com/graph/interactivity_tooltip.html
+            // mouseover --> mousemove --> mouseout
+            var generateTooltip = d3.select("#container")
+                .append("div")
+                .style("position", "absolute")
+                .style("opacity", 0)
+                .attr("class", "tooltip")
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "1px")
+                .style("border-radius", "5px")
+                .style("padding", "10px")
+
+            // d3.select("#circleCustomTooltip")
+
+            var mouseover = (d, _) => {
+                generateTooltip.style("opacity", 1)
+            }
+
+            // Remove AverageCityMPG @ Tooltip
+            var mousemove = (d, e) => {
+                generateTooltip
+                    .html(`Make: ${d.Make}<br>Fuel: ${d.Fuel}<br>Average Highway MPG: ${d.AverageHighwayMPG}`)
+                    .style("left", (event.x) / 2 + "px")
+                    .style("top", (event.y) / 2 + "px")
+            }
+
+            var mouseout = (d, _) => {
+                generateTooltip
+                    .transition()
+                    .style("opacity", 0)
+            }
+
+            // Tickmarks @ y axis (8-1-4)
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .call(d3.axisLeft(y)
+                    .tickValues([10, 25, 50, 100, 125, 150])
+                    .tickFormat((d, _) => d3.format("~s")(d)));
+
+            // Labels @ y axis (8-1-4), y axis first then x axis*?
+            d3.select("#scatterplot")
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0)
+                .attr("x", 0 - (height / 2 + margin))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Average Highway MPG");
+
+            // Tickmarks @ x Axis (8-1-4)
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + (margin + height) + ")")
+                .call(d3.axisBottom(x)
+                    .tickValues([0, 2, 4, 6, 8, 10, 12])
+                    .tickFormat((d, _) => d3.format("~s")(d)));
+
+            // Labels @ x axis (8-1-4), y axis first then x axis*?
+            d3.select("#scatterplot")
+                .append("text")
+                .attr("transform", "translate(" + (width / 2 + margin) + " ," + (margin + height + 40) + ")")
+                .style("text-anchor", "middle")
+                .text("# of Cylinders");
+
+            // Fill in scatterplot (8-2-6)
+            d3.select("#scatterplot")
+                .attr("width", width + (2 * margin))
+                .attr("height", height + (2 * margin))
+                .append("g")
+                .attr("transform", "translate(" + margin + "," + margin + ")")
+                .selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("class", (d, _) => d.Fuel.toLowerCase())
+                .attr("cx", (d, _) => x(d.EngineCylinders))
+                .attr("cy", (d, _) => y(d.AverageHighwayMPG))
+                .attr("r", (d, _) => parseInt(d.EngineCylinders) + 2)
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseout", mouseout);
+
+            // Legend --> Loops?
+            // https://d3-graph-gallery.com/graph/custom_legend.html
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 200).attr("r", 3).style("fill", "crimson")
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 220).attr("r", 3).style("fill", "gold")
+            d3.select("#scatterplot").append("circle").attr("cx", 300).attr("cy", 240).attr("r", 3).style("fill", "steelblue")
+
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 200).text("Diesel").style("font-size", "15px").attr("alignment-baseline", "middle")
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 220).text("Electricity").style("font-size", "15px").attr("alignment-baseline", "middle")
+            d3.select("#scatterplot").append("text").attr("x", 320).attr("y", 240).text("Gasoline").style("font-size", "15px").attr("alignment-baseline", "middle")
+
+            // Annotation
+            const annotations = [{
+                note: {
+                    title: "Electric Cars",
+                    label: "A large amount of electric cars appear to have 0 cylinders.",
+                    wrap: 140
+                },
+                x: 80,
+                y: 100,
+                dx: 70,
+                dy: -20,
+                color: "black"
+            }];
+
+            const makeAnnotations = d3.annotation()
+                .type(d3.annotationLabel)
+                .annotations(annotations);
+
+            d3.select("#scatterplot")
+                .append("g")
+                .attr("class", "annotation-group")
+                .call(makeAnnotations);
+
+
+            // Data Analysis
+            let p = `
+            This scatterplot visualizes the relationship betwen Average Highway MPG and # of cylinders for different car types (diesel, electricity, gasoline). Similar to the second scatterplot, each car model is represented by a circle on the scatterplot and the size of the circle is determined by the # of cylinders the car has in its engine. Again, when hovering over a data point, a tooltip will appear, displaying additional information about the car's make, fuel type, Average MPG's and # of cylinders. This scatterplot demonstrates how having a lot of engine cylinders may affect your fuel efficiency on the highway and also shows generally which type of cars has more cylinders than others. We see that electric cars which tend to have no engine cylinders have the highest fuel efficiency.
+            `
+
+            // Add Data Analysis to Page
+            d3.select("#firstscene")
+                .html(p)
+        }
+
+        // Trigger (Page = Parameter)
+        // NO ELIF IN JS
+        function pageTrigger(page) {
+
+            if (page == 1) {
+                generateScatterplot();
+            }
+
+            if (page == 2) {
+                generateSecondScatterplot();
+            }
+
+            if (page == 3) {
+                generateThirdScatterplot();
+            }
+        }
+
+        // Way to get rid of previous button @ page = 1?
+        // Way to get rid of next button @ page = 3?
+        // Just return blank...
+
+        function nextPage() {
+
+            if (page == 3) {
+                return;
+            }
+
+            page = Math.min(page + 1, 3)
+
+            d3.select("#scatterplot").html("")
+            d3.select("#page").text(`Page ${page} / 3`)
+            pageTrigger(page);
+        }
+
+        function previousPage() {
+
+            if (page == 1) {
+                return;
+            }
+
+            page = Math.max(page - 1, 1)
+
+            // d3.select(d).html("") @ Instructions
+            d3.select("#scatterplot").html("")
+            d3.select("#page").text(`Page ${page} / 3`)
+            pageTrigger(page);
+        }
+    </script>
+</body>
+
+</html>
